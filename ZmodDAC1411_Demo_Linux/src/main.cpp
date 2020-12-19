@@ -54,13 +54,21 @@ void dacRampDemo(float offset, float amplitude, float step, uint8_t channel, uin
 	}
 	else if (amplitude != 0)
 	{
-
-		length = (size_t)(amplitude/step) << 2;
 		int i;
-		if (length > ((1<<14) - 1))
+		length = 0;
+		for(val = -amplitude; val < amplitude; val += step)
 		{
-			// limit the length to maximum buffer size (1<<14 - 1)
-			length = ((1<<14) - 1);
+			length++;
+		}
+		for(val = amplitude; val > -amplitude; val -= step)
+		{
+			length++;
+		}
+//		length = (size_t)(amplitude/step) << 2;
+		if (length > ((1<<16) - 1))
+		{
+			// limit the length to maximum buffer size (1<<16 - 1)
+			length = ((1<<16) - 1);
 			// adjust step
 			step = amplitude/(length>>2);
 		}
@@ -85,6 +93,16 @@ void dacRampDemo(float offset, float amplitude, float step, uint8_t channel, uin
 			valBuf = dacZmod.arrangeChannelData(channel, valRaw);
 			buf[i++] = valBuf;
 		}
+		std::cout << "\nused length: ";
+		std::cout << length;
+		std::cout << "\nused step: ";
+		std::cout << step;
+		std::cout << "\nlast i: ";
+		std::cout << i;
+		std::cout << "\nlast value: ";
+		std::cout << val;
+		std::cout << "\nlast value raw: ";
+		std::cout << valRaw;
 	}
 	// send data to DAC and start the instrument
 	dacZmod.setData(buf, length);
@@ -100,6 +118,8 @@ int main() {
 	// channel 					CH1
 	// Output Frequency Divider	2
 	// gain						HIGH - corresponds to HIGH input Range
-	dacRampDemo(2, 3, 0.01, 0, 2, 1);
+//	dacRampDemo(2, 3, 0.01, 0, 2, 1);
+//	dacRampDemo(2, 3, 0.000183700, 0, 0, 1); // ok
+	dacRampDemo(2, 3, 0.000183705, 0, 0, 1); // bad
 	return 0;
 }
