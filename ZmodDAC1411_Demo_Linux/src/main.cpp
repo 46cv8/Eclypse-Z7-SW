@@ -119,7 +119,6 @@ int main() {
 	// Output Frequency Divider	2
 	// gain						HIGH - corresponds to HIGH input Range
 //	dacRampDemo(2, 3, 0.01, 0, 2, 1);
-//	dacRampDemo(2, 3, 0.000183700, 0, 0, 1); // ok
-	dacRampDemo(2, 3, 0.000183705, 0, 0, 1); // bad
+	dacRampDemo(2, 3, 0.0001, 0, 0, 1);
 	return 0;
 }
