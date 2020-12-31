@@ -65,10 +65,10 @@ void dacRampDemo(float offset, float amplitude, float step, uint8_t channel, uin
 			length++;
 		}
 //		length = (size_t)(amplitude/step) << 2;
-		if (length > ((1<<16) - 1))
+		if (length > ((1<<17) - 1))
 		{
 			// limit the length to maximum buffer size (1<<16 - 1)
-			length = ((1<<16) - 1);
+			length = ((1<<17) - 1);
 			// adjust step
 			step = amplitude/(length>>2);
 		}
