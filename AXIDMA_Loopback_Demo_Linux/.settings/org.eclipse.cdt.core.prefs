@@ -1,11 +1,5 @@
 eclipse.preferences.version=1
-environment/project/xilinx.gnu.armv7.linux.exe.debug.2057872467/SYSROOT/delimiter=\:
-environment/project/xilinx.gnu.armv7.linux.exe.debug.2057872467/SYSROOT/operation=replace
-environment/project/xilinx.gnu.armv7.linux.exe.debug.2057872467/SYSROOT/value=/home/peter/shares/digilent/Eclypse-Z7-OS_axidma_loopback/images/linux/sdk/sysroots/cortexa9t2hf-neon-xilinx-linux-gnueabi/
 environment/project/xilinx.gnu.armv7.linux.exe.debug.2057872467/append=true
 environment/project/xilinx.gnu.armv7.linux.exe.debug.2057872467/appendContributed=true
-environment/project/xilinx.gnu.armv7.linux.exe.release.1869512625/SYSROOT/delimiter=\:
-environment/project/xilinx.gnu.armv7.linux.exe.release.1869512625/SYSROOT/operation=replace
-environment/project/xilinx.gnu.armv7.linux.exe.release.1869512625/SYSROOT/value=/home/peter/shares/digilent/Eclypse-Z7-OS_axidma_loopback/images/linux/sdk/sysroots/cortexa9t2hf-neon-xilinx-linux-gnueabi/
 environment/project/xilinx.gnu.armv7.linux.exe.release.1869512625/append=true
 environment/project/xilinx.gnu.armv7.linux.exe.release.1869512625/appendContributed=true
