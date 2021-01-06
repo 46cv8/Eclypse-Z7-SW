@@ -18,9 +18,11 @@
 
 #define TRANSFER_LEN	0x400
 #define ZMOD_DAC_BASE_ADDR 	XPAR_ZMODDAC_0_AXI_ZMODDAC1411_V1_0_0_BASEADDR
-#define DMA_DAC_BASE_ADDR 	XPAR_ZMODDAC_0_AXI_DMA_1_BASEADDR
+#define DMA_DAC_CH1_BASE_ADDR 	XPAR_ZMODDAC_0_AXI_DMA_CH1_BASEADDR
+#define DMA_DAC_CH2_BASE_ADDR 	XPAR_ZMODDAC_0_AXI_DMA_CH2_BASEADDR
 #define FLASH_ADDR_DAC   	0x31
-#define DMA_DAC_IRQ 		XPAR_FABRIC_ZMODDAC_0_AXI_DMA_1_MM2S_INTROUT_INTR
+#define DMA_DAC_CH1_IRQ 		XPAR_FABRIC_ZMODDAC_0_AXI_DMA_CH1_MM2S_INTROUT_INTR
+#define DMA_DAC_CH2_IRQ 		XPAR_FABRIC_ZMODDAC_0_AXI_DMA_CH2_MM2S_INTROUT_INTR
 #define IIC_BASE_ADDR   XPAR_PS7_I2C_1_BASEADDR
 
 /*
@@ -34,21 +36,19 @@
 */
 void dacRampDemo(float offset, float amplitude, float step, uint8_t channel, uint8_t frequencyDivider, uint8_t gain)
 {
-	ZMODDAC1411 dacZmod(ZMOD_DAC_BASE_ADDR, DMA_DAC_BASE_ADDR, IIC_BASE_ADDR, FLASH_ADDR_DAC, DMA_DAC_IRQ);
-	uint32_t *buf;
+	ZMODDAC1411 dacZmod(ZMOD_DAC_BASE_ADDR, DMA_DAC_CH1_BASE_ADDR, DMA_DAC_CH2_BASE_ADDR, IIC_BASE_ADDR, FLASH_ADDR_DAC, DMA_DAC_CH1_IRQ, DMA_DAC_CH2_IRQ);
+	uint16_t *buf;
 	float val;
-	uint32_t valBuf;
-	int16_t valRaw;
+	uint16_t valRaw;
 	size_t length;
 	if (amplitude == 0)
 	{
 		length = 1;
-		buf = dacZmod.allocChannelsBuffer(length);
+		buf = dacZmod.allocBuffer(channel, length);
 		dacZmod.setOutputSampleFrequencyDivider(frequencyDivider);
 		dacZmod.setGain(channel, gain);
 		valRaw = dacZmod.getSignedRawFromVolt(offset, gain);
-		valBuf = dacZmod.arrangeChannelData(channel, valRaw);
-		buf[0] = valBuf;
+		buf[0] = valRaw;
 	}
 	else if (amplitude != 0)
 	{
@@ -62,7 +62,7 @@ void dacRampDemo(float offset, float amplitude, float step, uint8_t channel, uin
 			step = amplitude/(length>>2);
 		}
 
-		buf = dacZmod.allocChannelsBuffer(length);
+		buf = dacZmod.allocBuffer(channel, length);
 
 		dacZmod.setOutputSampleFrequencyDivider(frequencyDivider);
 		dacZmod.setGain(channel, gain);
@@ -72,22 +72,26 @@ void dacRampDemo(float offset, float amplitude, float step, uint8_t channel, uin
 		for(val = -amplitude; val < amplitude; val += step)
 		{
 			valRaw = dacZmod.getSignedRawFromVolt(val + offset, gain);
-			valBuf = dacZmod.arrangeChannelData(channel, valRaw);
-			buf[i++] = valBuf;
+			buf[i++] = valRaw;
 		}
 		// ramp down
 		for(val = amplitude; val > -amplitude; val -= step)
 		{
 			valRaw = dacZmod.getSignedRawFromVolt(val + offset, gain);
-			valBuf = dacZmod.arrangeChannelData(channel, valRaw);
-			buf[i++] = valBuf;
+			buf[i++] = valRaw;
 		}
 	}
 	// send data to DAC and start the instrument
-	dacZmod.setData(buf, length);
+	dacZmod.setData(channel, buf, length);
 	dacZmod.start();
+	for (uint16_t i = 0; i < 50; i++)
+	{
+		while (!dacZmod.isDMATransferComplete(channel)) {;}
+		dacZmod.setData(channel, buf, length);
+	}
+	while (!dacZmod.isDMATransferComplete(channel)) {;}
 
-	dacZmod.freeChannelsBuffer(buf, length);
+	dacZmod.freeBuffer(channel, buf, length);
 
 }
 
