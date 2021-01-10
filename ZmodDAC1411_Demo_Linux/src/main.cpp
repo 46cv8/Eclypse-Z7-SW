@@ -29,49 +29,53 @@
 #define DAC_DMA_CH1_IRQ 		61
 #define DAC_DMA_CH2_IRQ 		62
 
+#define PI 3.14159265358979323846
+
+/*
+ * Modulated Signal Test Using 3 Frequencies
+ * https://ccrma.stanford.edu/~jos/mdft/Sinusoidal_Amplitude_Modulation_AM.html
+ * https://www.youtube.com/watch?v=NgT5u1R2xKo
+ *
+ * @param freq1 - the first modulation frequency
+ * @param freq2 - the first modulation frequency
+ * @param freq3 - the first modulation frequency
+ * @param offset - the voltage offset for the generated ramp
+ * @param amplitude - the amplitude for the generated ramp
+ * @param length - the samples to use for this waveform
+ */
+void dacModulated(ZMODDAC1411 *dacZmod, uint16_t *buf, double freq1, double freq2, double freq3, float amplitude, size_t length, uint8_t gain)
+{
+	double freq1_mf = (double)2*(double)PI*freq1/(double)length;
+	double freq2_mf = (double)2*(double)PI*freq2/(double)length;
+	double freq3_mf = (double)2*(double)PI*freq3/(double)length;
+	for (uint32_t i = 0; i < length; i++)
+	{
+		buf[i] = dacZmod->getSignedRawFromVolt(
+			amplitude*sin(i*freq1_mf)*sin(i*freq2_mf)*sin(i*freq3_mf),
+			gain
+		);
+	}
+}
+
 /*
  * Simple DAC test, using simple ramp values populated in the buffer.
-* @param offset - the voltage offset for the generated ramp
-* @param amplitude - the amplitude for the generated ramp
-* @param targetLength - the samples to use for this ramp waveform
-* @param channel - the channel where samples will be generated
-* @param gain - the gain for the channel
-* @param cycles - the number of cycles to run the waveform
-*/
-void dacRampDemo(ZMODDAC1411 *dacZmod, uint16_t *buf, float offset, float amplitude, size_t length, uint8_t channel, uint8_t gain)
+ * @param offset - the voltage offset for the generated ramp
+ * @param amplitude - the amplitude for the generated ramp
+ * @param length - the samples to use for this waveform
+ */
+void dacRampDemo(ZMODDAC1411 *dacZmod, uint16_t *buf, float offset, float amplitude, size_t length, uint8_t gain)
 {
-//	float val;
-//	float step = amplitude/(length>>2);
-//	uint16_t valRaw;
 	uint32_t i;
 	int64_t valInt;
 	int64_t offsetInt = ((double)offset/(double)(gain ? 5.0:1.25))*(double)((int64_t)1<<(13+48));
 	int64_t amplitudeInt = ((double)amplitude/(double)(gain ? 5.0:1.25))*(double)((int64_t)1<<(13+48));
 	int64_t stepInt = amplitudeInt/(length>>2);
 
-	dacZmod->setGain(channel, gain);
-
 	// ramp up
 	i = 0;
-////	val = -amplitude;
-//	for(; i < length>>1; i++)
-//	{
-//		val = -amplitude + (i*amplitude)/(length>>2);
-//		valRaw = dacZmod->getSignedRawFromVolt(val + offset, gain);
-//		buf[i] = valRaw;
-////		val += step;
-//	}
-//	// ramp down
-////	val = amplitude;
-//	for(; i < length; i++)
-//	{
-//		val = amplitude - ((i-(length>>1))*amplitude)/(length>>2);
-//		valRaw = dacZmod->getSignedRawFromVolt(val + offset, gain);
-//		buf[i] = valRaw;
-////		val -= step;
-//	}
 	valInt = -amplitudeInt+offsetInt;
-	if (valInt < (int64_t)-0x1FFF << 48) {
+	if (valInt < (int64_t)-0x1FFF << 48)
+	{
 		valInt = (int64_t)-0x1FFF << 48;
 	}
 	for(; i < length>>1; i++)
@@ -84,7 +88,8 @@ void dacRampDemo(ZMODDAC1411 *dacZmod, uint16_t *buf, float offset, float amplit
 	}
 	// ramp down
 	valInt = amplitudeInt+offsetInt;
-	if (valInt > (int64_t)0x1FFF << 48) {
+	if (valInt > (int64_t)0x1FFF << 48)
+	{
 		valInt = (int64_t)0x1FFF << 48;
 	}
 	for(; i < length; i++)
@@ -96,8 +101,6 @@ void dacRampDemo(ZMODDAC1411 *dacZmod, uint16_t *buf, float offset, float amplit
 		valInt -= stepInt;
 	}
 
-	std::cout << "\nchannel: ";
-	std::cout << (int)channel;
 	std::cout << "\nused length: ";
 	std::cout << length;
 	std::cout << "\nused amplitudeInt: ";
@@ -116,8 +119,8 @@ int main() {
 	std::cout << "\nZmodDAC1411 Demo Started";
 
 	ZMODDAC1411 dacZmod(DAC_BASE_ADDR, DAC_DMA_CH1_BASE_ADDR, DAC_DMA_CH2_BASE_ADDR, IIC_BASE_ADDR, DAC_FLASH_ADDR, DAC_DMA_CH1_IRQ, DAC_DMA_CH2_IRQ);
-	size_t lengthCh1 = 0x10000000; // 0x10000000
-	size_t lengthCh2 = 40000; // 45000000
+	size_t lengthCh1 = 100000000; // 0x10000000
+	size_t lengthCh2 = 100000000; // 45000000
 	uint16_t *bufCh1 = dacZmod.allocBuffer(0, lengthCh1);
 	uint16_t *bufCh2 = dacZmod.allocBuffer(1, lengthCh2);
 	uint32_t currentCycleCh1 = 0;
@@ -126,21 +129,28 @@ int main() {
 	struct timeval stop, start;
 
 	dacZmod.setOutputSampleFrequencyDivider(0);
+	// channel 					0 - CH1, 1 - CH2
+	// gain						1 - corresponds to HIGH input Range
+	dacZmod.setGain(0, 1);
+	dacZmod.setGain(1, 1);
 
 	// dacPtr
 	// bufPtr
 	// offset 					2 V
 	// amplitude 				3 V
 	// length 					20000000 Samples
-	// channel 					0 - CH1, 1 - CH2
-	// gain						HIGH - corresponds to HIGH input Range
+	// gain						1 - corresponds to HIGH input Range
 	gettimeofday(&start, NULL);
-	dacRampDemo(&dacZmod, bufCh1, 2, 3, lengthCh1, 0, 1);
+//	dacRampDemo(&dacZmod, bufCh1, 2, 3, lengthCh1, 1);
+	// first two terms		sin2*sin3 = cos(3-2)+cos(3+2) = cos(1)+cos(5)
+	// all three terms		sin2*sin3*sin(5) = cos(3-2)+cos(3+2) = cos(4)+cos(6)+cos(10)  (2 -2)*(3 -3)*(5 -5) = ((2+3) (-2+-3) + (-2+3) (-3+2))(5 -5) = (5 -5 1 -1)(5 -5) = ((5+5) (-5+-5) (5-5) (-5+5) (1+5) (-1+-5) (5-1) (1-5)) = (10, -10, 0, 0, 6, -6, 4, -4)
+	dacModulated(&dacZmod, bufCh1, 2, 3, 5, 3, lengthCh1, 1); // 0, 4, 6, 10
 	gettimeofday(&stop, NULL);
 	std::cout << "\nCh1 Buffer Populated in ";
 	std::cout << ((stop.tv_sec - start.tv_sec) * 1000000 + stop.tv_usec - start.tv_usec);
 	gettimeofday(&start, NULL);
-	dacRampDemo(&dacZmod, bufCh2, 2, 3, lengthCh2, 1, 1);
+//	dacRampDemo(&dacZmod, bufCh2, 2, 3, lengthCh2, 1);
+//	dacModulated(&dacZmod, bufCh2, 3, 5, 7, 3, lengthCh2, 1); // 15, 9, 5, 1
 	gettimeofday(&stop, NULL);
 	std::cout << "\nCh2 Buffer Populated in ";
 	std::cout << ((stop.tv_sec - start.tv_sec) * 1000000 + stop.tv_usec - start.tv_usec);
