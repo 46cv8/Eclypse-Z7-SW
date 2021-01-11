@@ -65,7 +65,7 @@ void dacModulated(ZMODDAC1411 *dacZmod, uint16_t *buf, double period1, double pe
 	for (uint32_t i = 0; i < length; i++)
 	{
 		buf[i] = dacZmod->getSignedRawFromVolt(
-			amplitude*sin(i*period1_2pi)*sin(i*period2_2pi)*sin(i*period3_2pi)*sin(i*period4_2pi),
+			amplitude*sin((double)i*period1_2pi)*sin(i*period2_2pi)*sin(i*period3_2pi)*sin(i*period4_2pi),
 			gain
 		);
 	}
@@ -133,31 +133,92 @@ int main() {
 	std::cout << "\nZmodDAC1411 Demo Started";
 
 	ZMODDAC1411 dacZmod(DAC_BASE_ADDR, DAC_DMA_CH1_BASE_ADDR, DAC_DMA_CH2_BASE_ADDR, IIC_BASE_ADDR, DAC_FLASH_ADDR, DAC_DMA_CH1_IRQ, DAC_DMA_CH2_IRQ);
-	uint32_t divider = (uint16_t)1<<14; // 65536 will work for frequencies below 2 khz (100000000÷16384)
-	double period1IdealCh1 = 100000000.0/(7.83*divider); // 1559.007822478
-	double period1Ch1 = round(period1IdealCh1); // 1559
-	double period2IdealCh1 = 100000000.0/(14.1*divider); // 865.746897163
-	double period2Ch1 = round(period2IdealCh1); // 866
-	size_t lengthCh1 = lcm((uint32_t)period1Ch1, (uint32_t)period2Ch1); // 1350094
-//	double period3IdealCh1 = 100000000.0/(1060.3*divider); // 11.512808875
-	double period3IdealCh1 = 100000000.0/(20.3*divider); // 11.512808875
-	uint32_t period3RepsCh1 = round((double)lengthCh1/period3IdealCh1); // 117268.862417383 -> 117269
-	double period3Ch1 = (double)lengthCh1/(double)period3RepsCh1; // 11.512795368
-	while(abs(period3IdealCh1-period3Ch1) > period3IdealCh1*0.005)
+	uint32_t divider = (uint16_t)1<<1; // 65536 will work for frequencies below 2 khz (100000000÷16384)
+	double period1IdealCh1 = 100000000.0/(7.83*divider); // 7.83
+	double period1Ch1 = period1IdealCh1;
+	uint32_t period1CntCh1 = 1;
+	double period2IdealCh1 = 100000000.0/(14.1*divider); // 14.1
+	double period2Ch1 = period2IdealCh1;
+	uint32_t period2CntCh1 = 1;
+	double period3IdealCh1 = 100000000.0/(20.3*divider); // 20.3
+	double period3Ch1 = period3IdealCh1;
+	uint32_t period3CntCh1 = 1;
+	double period4IdealCh1 = 100000000.0/(1000000.0*divider);
+	double period4Ch1 = period4IdealCh1;
+	uint32_t period4CntCh1 = 1;
+	double matchingTolerance = 1.01;
+	while (true)
 	{
-		lengthCh1 = 2*lengthCh1;
-		period3RepsCh1 = round((double)lengthCh1/period3IdealCh1);
-		period3Ch1 = (double)lengthCh1/(double)period3RepsCh1;
+		if (
+				period2Ch1/divider > 5000 &&
+				(period2Ch1 / matchingTolerance < period1Ch1 && period1Ch1 < period2Ch1 * matchingTolerance) &&
+				(period3Ch1 / matchingTolerance < period1Ch1 && period1Ch1 < period3Ch1 * matchingTolerance) &&
+				(period4Ch1 / matchingTolerance < period1Ch1 && period1Ch1 < period4Ch1 * matchingTolerance) &&
+				(period1Ch1 / matchingTolerance < period2Ch1 && period2Ch1 < period1Ch1 * matchingTolerance) &&
+				(period3Ch1 / matchingTolerance < period2Ch1 && period2Ch1 < period3Ch1 * matchingTolerance) &&
+				(period4Ch1 / matchingTolerance < period2Ch1 && period2Ch1 < period4Ch1 * matchingTolerance) &&
+				(period1Ch1 / matchingTolerance < period3Ch1 && period3Ch1 < period1Ch1 * matchingTolerance) &&
+				(period2Ch1 / matchingTolerance < period3Ch1 && period3Ch1 < period2Ch1 * matchingTolerance) &&
+				(period4Ch1 / matchingTolerance < period3Ch1 && period3Ch1 < period4Ch1 * matchingTolerance) &&
+				(period1Ch1 / matchingTolerance < period4Ch1 && period4Ch1 < period1Ch1 * matchingTolerance) &&
+				(period2Ch1 / matchingTolerance < period4Ch1 && period4Ch1 < period2Ch1 * matchingTolerance) &&
+				(period3Ch1 / matchingTolerance < period4Ch1 && period4Ch1 < period3Ch1 * matchingTolerance)
+			)
+		{
+			break;
+		}
+		if (period1Ch1 < period2Ch1 && period1Ch1 < period3Ch1 && period1Ch1 < period4Ch1)
+		{
+			period1Ch1 += period1IdealCh1;
+			period1CntCh1++;
+		}
+		else if (period2Ch1 < period1Ch1 && period2Ch1 < period3Ch1 && period2Ch1 < period4Ch1)
+		{
+			period2Ch1 += period2IdealCh1;
+			period2CntCh1++;
+		}
+		else if (period3Ch1 < period1Ch1 && period3Ch1 < period2Ch1 && period3Ch1 < period4Ch1)
+		{
+			period3Ch1 += period3IdealCh1;
+			period3CntCh1++;
+		}
+		else if (period4Ch1 < period1Ch1 && period4Ch1 < period2Ch1 && period4Ch1 < period3Ch1)
+		{
+			period4Ch1 += period4IdealCh1;
+			period4CntCh1++;
+		}
+		else if (period1Ch1 <= period2Ch1 && period1Ch1 <= period3Ch1 && period1Ch1 <= period4Ch1)
+		{
+			period1Ch1 += period1IdealCh1;
+			period1CntCh1++;
+		}
+		else if (period2Ch1 <= period1Ch1 && period2Ch1 <= period3Ch1 && period2Ch1 <= period4Ch1)
+		{
+			period2Ch1 += period2IdealCh1;
+			period2CntCh1++;
+		}
+		else if (period3Ch1 <= period1Ch1 && period3Ch1 <= period2Ch1 && period3Ch1 <= period4Ch1)
+		{
+			period3Ch1 += period3IdealCh1;
+			period3CntCh1++;
+		}
+		else if (period4Ch1 <= period1Ch1 && period4Ch1 <= period2Ch1 && period4Ch1 <= period3Ch1)
+		{
+			period4Ch1 += period4IdealCh1;
+			period4CntCh1++;
+		}
 	}
-	double period4IdealCh1 = 100000000.0/(39.3*divider); // 11.512808875
-	uint32_t period4RepsCh1 = round((double)lengthCh1/period4IdealCh1); // 117268.862417383 -> 117269
-	double period4Ch1 = (double)lengthCh1/(double)period4RepsCh1; // 11.512795368
-	while(abs(period4IdealCh1-period4Ch1) > period4IdealCh1*0.005)
-	{
-		lengthCh1 = 2*lengthCh1;
-		period4RepsCh1 = round((double)lengthCh1/period4IdealCh1);
-		period4Ch1 = (double)lengthCh1/(double)period4RepsCh1;
-	}
+	size_t lengthCh1 = (period1Ch1 + period2Ch1 + period3Ch1 + period4Ch1) / 4;
+	period1Ch1 = lengthCh1 / period1CntCh1;
+	period2Ch1 = lengthCh1 / period2CntCh1;
+	period3Ch1 = lengthCh1 / period3CntCh1;
+	period4Ch1 = lengthCh1 / period4CntCh1;
+
+	std::cout << "\nlengthCh1: " << lengthCh1 << " divider: " << divider << " duration: " << (lengthCh1*divider/100000000.0);
+	std::cout << "\nperiod1Ch1: " << period1Ch1 << " period2Ch1: " << period2Ch1 << " period3Ch1: " << period3Ch1 << " period4Ch1: " << period4Ch1;
+	std::cout << "\ntarget freq1Ch1: " << 100000000.0/(double)(period1IdealCh1*divider) << " freq2Ch1: " << 100000000.0/(double)(period2IdealCh1*divider) << " freq3Ch1: " << 100000000.0/(double)(period3IdealCh1*divider) << " freq4Ch1: " << 100000000.0/(double)(period4IdealCh1*divider);
+	std::cout << "\nused freq1Ch1: " << 100000000.0/(double)(period1Ch1*divider) << " freq2Ch1: " << 100000000.0/(double)(period2Ch1*divider) << " freq3Ch1: " << 100000000.0/(double)(period3Ch1*divider) << " freq4Ch1: " << 100000000.0/(double)(period4Ch1*divider);
+	std::cout << std::flush;
 	if (lengthCh1 > 300000000)
 	{
 		std::cout << "\nrequired buffer length is to long " << lengthCh1 << std::flush;
@@ -171,11 +232,6 @@ int main() {
 	uint32_t maxCycles = 100000;
 	struct timeval stop, start;
 
-	std::cout << "\nlengthCh1: " << lengthCh1 << " divider: " << divider;
-	std::cout << "\nperiod1Ch1: " << period1Ch1 << " period2Ch1: " << period2Ch1 << " period3Ch1: " << period3Ch1 << " period4Ch1: " << period4Ch1;
-	std::cout << "\ntarget freq1Ch1: " << 100000000.0/(double)(period1IdealCh1*divider) << " freq2Ch1: " << 100000000.0/(double)(period2IdealCh1*divider) << " freq3Ch1: " << 100000000.0/(double)(period3IdealCh1*divider) << " freq4Ch1: " << 100000000.0/(double)(period4IdealCh1*divider);
-	std::cout << "\nused freq1Ch1: " << 100000000.0/(double)(period1Ch1*divider) << " freq2Ch1: " << 100000000.0/(double)(period2Ch1*divider) << " freq3Ch1: " << 100000000.0/(double)(period3Ch1*divider) << " freq4Ch1: " << 100000000.0/(double)(period4Ch1*divider);
-	std::cout << std::flush;
 
 
 	dacZmod.setOutputSampleFrequencyDivider(divider);
@@ -213,7 +269,7 @@ int main() {
 	sleep(0.1);
 	dacZmod.start();
 	gettimeofday(&start, NULL);
-	while (((stop.tv_sec - start.tv_sec) * 1000000 + stop.tv_usec - start.tv_usec) < 10000000 && (currentCycleCh1 < maxCycles || currentCycleCh2 < maxCycles))
+	while (((stop.tv_sec - start.tv_sec) * 1000000 + stop.tv_usec - start.tv_usec) < 100000000 || currentCycleCh1 < maxCycles || currentCycleCh2 < maxCycles)
 	{
 		if (dacZmod.isDMATransferComplete(0))
 		{
