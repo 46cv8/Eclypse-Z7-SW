@@ -51,19 +51,21 @@ uint32_t lcm(uint32_t a, uint32_t b)
  * @param period1 - the first modulation frequency
  * @param period2 - the first modulation frequency
  * @param period3 - the first modulation frequency
+ * @param period4 - the first modulation frequency
  * @param amplitude - the amplitude for the generated ramp
  * @param length - the samples to use for this waveform
  * @param gain - 1 - corresponds to HIGH input Range
  */
-void dacModulated(ZMODDAC1411 *dacZmod, uint16_t *buf, uint32_t period1, uint32_t period2, uint32_t period3, float amplitude, size_t length, uint8_t gain)
+void dacModulated(ZMODDAC1411 *dacZmod, uint16_t *buf, double period1, double period2, double period3, double period4, float amplitude, size_t length, uint8_t gain)
 {
 	double period1_2pi = (double)2*(double)PI/(double)period1;
 	double period2_2pi = (double)2*(double)PI/(double)period2;
 	double period3_2pi = (double)2*(double)PI/(double)period3;
+	double period4_2pi = (double)2*(double)PI/(double)period4;
 	for (uint32_t i = 0; i < length; i++)
 	{
 		buf[i] = dacZmod->getSignedRawFromVolt(
-			amplitude*sin(i*period1_2pi)*sin(i*period2_2pi)*sin(i*period3_2pi),
+			amplitude*sin(i*period1_2pi)*sin(i*period2_2pi)*sin(i*period3_2pi)*sin(i*period4_2pi),
 			gain
 		);
 	}
@@ -131,20 +133,37 @@ int main() {
 	std::cout << "\nZmodDAC1411 Demo Started";
 
 	ZMODDAC1411 dacZmod(DAC_BASE_ADDR, DAC_DMA_CH1_BASE_ADDR, DAC_DMA_CH2_BASE_ADDR, IIC_BASE_ADDR, DAC_FLASH_ADDR, DAC_DMA_CH1_IRQ, DAC_DMA_CH2_IRQ);
-	uint32_t divider = (uint16_t)1<<13; // 65536 will work for frequencies below 2 khz (100000000÷16384)
-	uint32_t period1Ch1 = round(100000000.0/(7.83*divider)); // 12771392.1 -> 195 -> 12779520
-	uint32_t period2Ch1 = round(100000000.0/(14.1*divider)); // 07092198.6 -> 108 -> 7077888
-//	uint32_t period3Ch1 = round(100000000.0/(20.3*divider)); // 04926108.4 -> 75 -> 4915200
-	uint32_t period3Ch1 = round(100000000.0/(1060.3*divider)); // 04926108.4 -> 75 -> 4915200
-	// https://www.calculatorsoup.com/calculators/math/lcm.php
-	// lcm(194.875978088, 108.218362427, 75.166448975) = lcm(195, 108, 75) = 478150
-	size_t lengthCh1 = lcm(lcm((uint32_t)round(period1Ch1), (uint32_t)round(period2Ch1)), (uint32_t)round(period3Ch1));
+	uint32_t divider = (uint16_t)1<<14; // 65536 will work for frequencies below 2 khz (100000000÷16384)
+	double period1IdealCh1 = 100000000.0/(7.83*divider); // 1559.007822478
+	double period1Ch1 = round(period1IdealCh1); // 1559
+	double period2IdealCh1 = 100000000.0/(14.1*divider); // 865.746897163
+	double period2Ch1 = round(period2IdealCh1); // 866
+	size_t lengthCh1 = lcm((uint32_t)period1Ch1, (uint32_t)period2Ch1); // 1350094
+//	double period3IdealCh1 = 100000000.0/(1060.3*divider); // 11.512808875
+	double period3IdealCh1 = 100000000.0/(20.3*divider); // 11.512808875
+	uint32_t period3RepsCh1 = round((double)lengthCh1/period3IdealCh1); // 117268.862417383 -> 117269
+	double period3Ch1 = (double)lengthCh1/(double)period3RepsCh1; // 11.512795368
+	while(abs(period3IdealCh1-period3Ch1) > period3IdealCh1*0.005)
+	{
+		lengthCh1 = 2*lengthCh1;
+		period3RepsCh1 = round((double)lengthCh1/period3IdealCh1);
+		period3Ch1 = (double)lengthCh1/(double)period3RepsCh1;
+	}
+	double period4IdealCh1 = 100000000.0/(39.3*divider); // 11.512808875
+	uint32_t period4RepsCh1 = round((double)lengthCh1/period4IdealCh1); // 117268.862417383 -> 117269
+	double period4Ch1 = (double)lengthCh1/(double)period4RepsCh1; // 11.512795368
+	while(abs(period4IdealCh1-period4Ch1) > period4IdealCh1*0.005)
+	{
+		lengthCh1 = 2*lengthCh1;
+		period4RepsCh1 = round((double)lengthCh1/period4IdealCh1);
+		period4Ch1 = (double)lengthCh1/(double)period4RepsCh1;
+	}
 	if (lengthCh1 > 300000000)
 	{
 		std::cout << "\nrequired buffer length is to long " << lengthCh1 << std::flush;
 		return 1;
 	}
-	size_t lengthCh2 = 1000; // 45000000
+	size_t lengthCh2 = 1000;
 	uint16_t *bufCh1 = dacZmod.allocBuffer(0, lengthCh1);
 	uint16_t *bufCh2 = dacZmod.allocBuffer(1, lengthCh2);
 	uint32_t currentCycleCh1 = 0;
@@ -152,8 +171,11 @@ int main() {
 	uint32_t maxCycles = 100000;
 	struct timeval stop, start;
 
-	std::cout << "\ndivider: " << divider << " period1Ch1: " << period1Ch1 << " period2Ch1: " << period2Ch1 << " period3Ch1: " << period3Ch1 << " lengthCh1: " << lengthCh1 << std::flush;
-	std::cout << "\nactual used frequencies freq1Ch1: " << 100000000.0/(double)(period1Ch1*divider) << " freq2Ch1: " << 100000000.0/(double)(period2Ch1*divider) << " freq3Ch1: " << 100000000.0/(double)(period3Ch1*divider) << std::flush;
+	std::cout << "\nlengthCh1: " << lengthCh1 << " divider: " << divider;
+	std::cout << "\nperiod1Ch1: " << period1Ch1 << " period2Ch1: " << period2Ch1 << " period3Ch1: " << period3Ch1 << " period4Ch1: " << period4Ch1;
+	std::cout << "\ntarget freq1Ch1: " << 100000000.0/(double)(period1IdealCh1*divider) << " freq2Ch1: " << 100000000.0/(double)(period2IdealCh1*divider) << " freq3Ch1: " << 100000000.0/(double)(period3IdealCh1*divider) << " freq4Ch1: " << 100000000.0/(double)(period4IdealCh1*divider);
+	std::cout << "\nused freq1Ch1: " << 100000000.0/(double)(period1Ch1*divider) << " freq2Ch1: " << 100000000.0/(double)(period2Ch1*divider) << " freq3Ch1: " << 100000000.0/(double)(period3Ch1*divider) << " freq4Ch1: " << 100000000.0/(double)(period4Ch1*divider);
+	std::cout << std::flush;
 
 
 	dacZmod.setOutputSampleFrequencyDivider(divider);
@@ -172,7 +194,7 @@ int main() {
 //	dacRampDemo(&dacZmod, bufCh1, 2, 3, lengthCh1, 1);
 	// first two terms		sin2*sin3 = cos(3-2)+cos(3+2) = cos(1)+cos(5)
 	// all three terms		sin2*sin3*sin(5) = cos(3-2)+cos(3+2) = cos(4)+cos(6)+cos(10)  (2 -2)*(3 -3)*(5 -5) = ((2+3) (-2+-3) + (-2+3) (-3+2))(5 -5) = (5 -5 1 -1)(5 -5) = ((5+5) (-5+-5) (5-5) (-5+5) (1+5) (-1+-5) (5-1) (1-5)) = (10, -10, 0, 0, 6, -6, 4, -4)
-	dacModulated(&dacZmod, bufCh1, period1Ch1, period2Ch1, period3Ch1, 3, lengthCh1, 1); // 0, 4, 6, 10
+	dacModulated(&dacZmod, bufCh1, period1Ch1, period2Ch1, period3Ch1, period4Ch1, 3, lengthCh1, 1); // 0, 4, 6, 10
 	gettimeofday(&stop, NULL);
 	std::cout << "\nCh1 Buffer Populated in ";
 	std::cout << ((stop.tv_sec - start.tv_sec) * 1000000 + stop.tv_usec - start.tv_usec);
@@ -190,7 +212,8 @@ int main() {
 	// sleep to ensure DAC has some data before starting
 	sleep(0.1);
 	dacZmod.start();
-	while (currentCycleCh1 < maxCycles || currentCycleCh2 < maxCycles)
+	gettimeofday(&start, NULL);
+	while (((stop.tv_sec - start.tv_sec) * 1000000 + stop.tv_usec - start.tv_usec) < 10000000 && (currentCycleCh1 < maxCycles || currentCycleCh2 < maxCycles))
 	{
 		if (dacZmod.isDMATransferComplete(0))
 		{
@@ -212,6 +235,7 @@ int main() {
 				dacZmod.setData(1, bufCh2, lengthCh2);
 			}
 		}
+		gettimeofday(&stop, NULL);
 	}
 	while (!dacZmod.isDMATransferComplete(0) || !dacZmod.isDMATransferComplete(1)) {;}
 	dacZmod.freeBuffer(0, bufCh1, lengthCh1);
