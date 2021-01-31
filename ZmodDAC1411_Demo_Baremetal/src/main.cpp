@@ -45,7 +45,7 @@ void dacRampDemo(float offset, float amplitude, float step, uint8_t channel, uin
 	{
 		length = 1;
 		buf = dacZmod.allocBuffer(channel, length);
-		dacZmod.setOutputSampleFrequencyDivider(frequencyDivider);
+		dacZmod.setOutputSampleFrequencyDivider(channel, frequencyDivider);
 		dacZmod.setGain(channel, gain);
 		valRaw = dacZmod.getSignedRawFromVolt(offset, gain);
 		buf[0] = valRaw;
@@ -64,7 +64,7 @@ void dacRampDemo(float offset, float amplitude, float step, uint8_t channel, uin
 
 		buf = dacZmod.allocBuffer(channel, length);
 
-		dacZmod.setOutputSampleFrequencyDivider(frequencyDivider);
+		dacZmod.setOutputSampleFrequencyDivider(channel, frequencyDivider);
 		dacZmod.setGain(channel, gain);
 
 		i = 0;

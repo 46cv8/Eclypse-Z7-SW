@@ -133,24 +133,24 @@ int main() {
 	std::cout << "\nZmodDAC1411 Demo Started";
 
 	ZMODDAC1411 dacZmod(DAC_BASE_ADDR, DAC_DMA_CH1_BASE_ADDR, DAC_DMA_CH2_BASE_ADDR, IIC_BASE_ADDR, DAC_FLASH_ADDR, DAC_DMA_CH1_IRQ, DAC_DMA_CH2_IRQ);
-	uint32_t divider = (uint16_t)1<<1; // 65536 will work for frequencies below 2 khz (100000000÷16384)
-	double period1IdealCh1 = 100000000.0/(7.83*divider); // 7.83
+	uint32_t dividerCh1 = (uint32_t)1<<14; // 1 is 100Mhz, 2 is 50Mhz, 4 is 25Mhz (must use power of 2 if you want to use interpolation)
+	double period1IdealCh1 = 100000000.0/(7.83*dividerCh1); // 7.83
 	double period1Ch1 = period1IdealCh1;
 	uint32_t period1CntCh1 = 1;
-	double period2IdealCh1 = 100000000.0/(14.1*divider); // 14.1
+	double period2IdealCh1 = 100000000.0/(14.1*dividerCh1); // 14.1
 	double period2Ch1 = period2IdealCh1;
 	uint32_t period2CntCh1 = 1;
-	double period3IdealCh1 = 100000000.0/(20.3*divider); // 20.3
+	double period3IdealCh1 = 100000000.0/(20.3*dividerCh1); // 20.3
 	double period3Ch1 = period3IdealCh1;
 	uint32_t period3CntCh1 = 1;
-	double period4IdealCh1 = 100000000.0/(1000000.0*divider);
+	double period4IdealCh1 = 100000000.0/(400.0*dividerCh1);
 	double period4Ch1 = period4IdealCh1;
 	uint32_t period4CntCh1 = 1;
-	double matchingTolerance = 1.01;
+	double matchingTolerance = 1.0001;
 	while (true)
 	{
 		if (
-				period2Ch1/divider > 5000 &&
+				(period1Ch1*(double)dividerCh1/100000000.0) > 0.001 && // waveform should exceed 1ms to ensure interrupts can fill queue buffer fast enough
 				(period2Ch1 / matchingTolerance < period1Ch1 && period1Ch1 < period2Ch1 * matchingTolerance) &&
 				(period3Ch1 / matchingTolerance < period1Ch1 && period1Ch1 < period3Ch1 * matchingTolerance) &&
 				(period4Ch1 / matchingTolerance < period1Ch1 && period1Ch1 < period4Ch1 * matchingTolerance) &&
@@ -165,6 +165,8 @@ int main() {
 				(period3Ch1 / matchingTolerance < period4Ch1 && period4Ch1 < period3Ch1 * matchingTolerance)
 			)
 		{
+
+			std::cout << "\nperiod1Ch1: " << period1Ch1 << " period2Ch1: " << period2Ch1 << " period3Ch1: " << period3Ch1 << " period4Ch1: " << period4Ch1;
 			break;
 		}
 		if (period1Ch1 < period2Ch1 && period1Ch1 < period3Ch1 && period1Ch1 < period4Ch1)
@@ -187,54 +189,50 @@ int main() {
 			period4Ch1 += period4IdealCh1;
 			period4CntCh1++;
 		}
-		else if (period1Ch1 <= period2Ch1 && period1Ch1 <= period3Ch1 && period1Ch1 <= period4Ch1)
-		{
-			period1Ch1 += period1IdealCh1;
-			period1CntCh1++;
-		}
-		else if (period2Ch1 <= period1Ch1 && period2Ch1 <= period3Ch1 && period2Ch1 <= period4Ch1)
-		{
-			period2Ch1 += period2IdealCh1;
-			period2CntCh1++;
-		}
-		else if (period3Ch1 <= period1Ch1 && period3Ch1 <= period2Ch1 && period3Ch1 <= period4Ch1)
-		{
-			period3Ch1 += period3IdealCh1;
-			period3CntCh1++;
-		}
-		else if (period4Ch1 <= period1Ch1 && period4Ch1 <= period2Ch1 && period4Ch1 <= period3Ch1)
-		{
-			period4Ch1 += period4IdealCh1;
-			period4CntCh1++;
-		}
 	}
 	size_t lengthCh1 = (period1Ch1 + period2Ch1 + period3Ch1 + period4Ch1) / 4;
-	period1Ch1 = lengthCh1 / period1CntCh1;
-	period2Ch1 = lengthCh1 / period2CntCh1;
-	period3Ch1 = lengthCh1 / period3CntCh1;
-	period4Ch1 = lengthCh1 / period4CntCh1;
+	period1Ch1 = (double)lengthCh1 / period1CntCh1;
+	period2Ch1 = (double)lengthCh1 / period2CntCh1;
+	period3Ch1 = (double)lengthCh1 / period3CntCh1;
+	period4Ch1 = (double)lengthCh1 / period4CntCh1;
 
-	std::cout << "\nlengthCh1: " << lengthCh1 << " divider: " << divider << " duration: " << (lengthCh1*divider/100000000.0);
+	std::cout << "\nlengthCh1: " << lengthCh1 << " dividerCh1: " << dividerCh1 << " duration: " << (lengthCh1*dividerCh1/100000000.0);
 	std::cout << "\nperiod1Ch1: " << period1Ch1 << " period2Ch1: " << period2Ch1 << " period3Ch1: " << period3Ch1 << " period4Ch1: " << period4Ch1;
-	std::cout << "\ntarget freq1Ch1: " << 100000000.0/(double)(period1IdealCh1*divider) << " freq2Ch1: " << 100000000.0/(double)(period2IdealCh1*divider) << " freq3Ch1: " << 100000000.0/(double)(period3IdealCh1*divider) << " freq4Ch1: " << 100000000.0/(double)(period4IdealCh1*divider);
-	std::cout << "\nused freq1Ch1: " << 100000000.0/(double)(period1Ch1*divider) << " freq2Ch1: " << 100000000.0/(double)(period2Ch1*divider) << " freq3Ch1: " << 100000000.0/(double)(period3Ch1*divider) << " freq4Ch1: " << 100000000.0/(double)(period4Ch1*divider);
+	std::cout << "\ntarget freq1Ch1: " << 100000000.0/(double)(period1IdealCh1*dividerCh1) << " freq2Ch1: " << 100000000.0/(double)(period2IdealCh1*dividerCh1) << " freq3Ch1: " << 100000000.0/(double)(period3IdealCh1*dividerCh1) << " freq4Ch1: " << 100000000.0/(double)(period4IdealCh1*dividerCh1);
+	std::cout << "\nused freq1Ch1: " << 100000000.0/(double)(period1Ch1*dividerCh1) << " freq2Ch1: " << 100000000.0/(double)(period2Ch1*dividerCh1) << " freq3Ch1: " << 100000000.0/(double)(period3Ch1*dividerCh1) << " freq4Ch1: " << 100000000.0/(double)(period4Ch1*dividerCh1);
 	std::cout << std::flush;
 	if (lengthCh1 > 300000000)
 	{
 		std::cout << "\nrequired buffer length is to long " << lengthCh1 << std::flush;
 		return 1;
 	}
-	size_t lengthCh2 = 1000;
+//	uint32_t dividerCh2 = (uint16_t)1<<18;
+//	double period1IdealCh2 = 100000000.0/(10.0*dividerCh2);
+//	uint32_t dividerCh2 = (uint16_t)1<<6;
+//	double period1IdealCh2 = 100000000.0/(100000.0*dividerCh2);
+//	uint32_t dividerCh2 = (uint16_t)1<<7; // 1 is 100Mhz, 2 is 50Mhz, 4 is 25Mhz (must use power of 2 if you want to use interpolation)
+	uint32_t dividerCh2 = 64; // 1 is 100Mhz, 2 is 50Mhz, 4 is 25Mhz (must use power of 2 if you want to use interpolation)
+	double period1IdealCh2 = 100000000.0/(40000.0*dividerCh2);
+	double period1Ch2 = period1IdealCh2;
+	size_t lengthCh2 = period1Ch2*100;
+	std::cout << "\nlengthCh2: " << lengthCh2 << " dividerCh2: " << dividerCh2 << " duration: " << (lengthCh2*dividerCh2/100000000.0);
+	std::cout << "\nperiod1Ch2: " << period1Ch2;
+
+
 	uint16_t *bufCh1 = dacZmod.allocBuffer(0, lengthCh1);
 	uint16_t *bufCh2 = dacZmod.allocBuffer(1, lengthCh2);
 	uint32_t currentCycleCh1 = 0;
 	uint32_t currentCycleCh2 = 0;
-	uint32_t maxCycles = 100000;
 	struct timeval stop, start;
 
 
 
-	dacZmod.setOutputSampleFrequencyDivider(divider);
+	dacZmod.setOutputSampleFrequencyDivider(0, dividerCh1);
+	dacZmod.setOutputSampleFrequencyDivider(1, dividerCh2);
+//	dacZmod.setInterpolateForFrequencyDivider(0, 0);
+	dacZmod.setInterpolateForFrequencyDivider(0, 1); // only works if dividerCh1 is 2^n
+//	dacZmod.setInterpolateForFrequencyDivider(1, 0);
+	dacZmod.setInterpolateForFrequencyDivider(1, 1); // only works if dividerCh2 is 2^n
 	// channel 					0 - CH1, 1 - CH2
 	// gain						1 - corresponds to HIGH input Range
 	dacZmod.setGain(0, 1);
@@ -255,8 +253,7 @@ int main() {
 	std::cout << "\nCh1 Buffer Populated in ";
 	std::cout << ((stop.tv_sec - start.tv_sec) * 1000000 + stop.tv_usec - start.tv_usec);
 	gettimeofday(&start, NULL);
-//	dacRampDemo(&dacZmod, bufCh2, 2, 3, lengthCh2, 1);
-//	dacModulated(&dacZmod, bufCh2, 3, 5, 7, 3, lengthCh2, 0, 1); // 15, 9, 5, 1
+	dacModulated(&dacZmod, bufCh2, period1Ch2, period1Ch2, period1Ch2, period1Ch2, 3, lengthCh2, 1);
 	gettimeofday(&stop, NULL);
 	std::cout << "\nCh2 Buffer Populated in ";
 	std::cout << ((stop.tv_sec - start.tv_sec) * 1000000 + stop.tv_usec - start.tv_usec);
@@ -269,30 +266,22 @@ int main() {
 	sleep(0.1);
 	dacZmod.start();
 	gettimeofday(&start, NULL);
-	while (((stop.tv_sec - start.tv_sec) * 1000000 + stop.tv_usec - start.tv_usec) < 100000000 || currentCycleCh1 < maxCycles || currentCycleCh2 < maxCycles)
+	while (((stop.tv_sec - start.tv_sec) * 1000000 + stop.tv_usec - start.tv_usec) < 30000000)
 	{
 		if (dacZmod.isDMATransferComplete(0))
 		{
 			currentCycleCh1++;
-//			std::cout << "\nch1 cycle completed: ";
-//			std::cout << currentCycleCh1;
-			if (currentCycleCh1 < maxCycles)
-			{
-				dacZmod.setData(0, bufCh1, lengthCh1);
-			}
+			dacZmod.setData(0, bufCh1, lengthCh1);
 		}
 		if (dacZmod.isDMATransferComplete(1))
 		{
 			currentCycleCh2++;
-//			std::cout << "\nch2 cycle completed: ";
-//			std::cout << currentCycleCh2;
-			if (currentCycleCh2 < maxCycles)
-			{
-				dacZmod.setData(1, bufCh2, lengthCh2);
-			}
+			dacZmod.setData(1, bufCh2, lengthCh2);
 		}
 		gettimeofday(&stop, NULL);
 	}
+	dacZmod.stopDMATransfer(0);
+	dacZmod.stopDMATransfer(1);
 	while (!dacZmod.isDMATransferComplete(0) || !dacZmod.isDMATransferComplete(1)) {;}
 	dacZmod.freeBuffer(0, bufCh1, lengthCh1);
 	dacZmod.freeBuffer(1, bufCh2, lengthCh2);
